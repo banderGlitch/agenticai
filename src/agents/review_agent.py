@@ -21,15 +21,13 @@ def review_user_stories(state):
     review_chain = LLMChain(llm=get_groq_llm(), prompt=get_review_prompt())
     feedback = review_chain.run(user_stories=state["user_stories"])
     
-    if "Approved" in feedback:
-        state["review_status"] = "Approved"
-    else:
-        state["review_status"] = "Needs Revision"
-        state["review_feedback"] = feedback
-    return state
+    state["review_feedback"] = feedback
+    state["review_status"] = "Pending User Approval"
+    return wait_for_user_approval(state)   # Automatically wait for user approval
+
 
 def user_approve_review(state, user_decision):
-    if user_decision == "Approve":
+    if user_decision == "Approved":
         state["review_status"] = "Approved"
     else:
         state["review_status"] = "Needs Revision"
