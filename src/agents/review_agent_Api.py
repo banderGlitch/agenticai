@@ -50,7 +50,6 @@ def wait_for_user_approval(state):
     return user_approve_review(state, user_review_store[user_story_key])
 
 @app.route('/review-feedback', methods=['POST'])
-
 def api_wait_for_approval():
     data = request.json
     review_status = data.get('review_status')
@@ -67,6 +66,22 @@ def user_approve_review(state, user_decision):
     else:
         state["review_status"] = "Needs Revision"
     return state
+
+
+
+
+
+
+
+def request_revised_user_stories(state):
+    """
+    Function to request revised user stories when the review fails.
+    In a real-world case, this would be handled via an API or UI interaction.
+    """
+    print("User stories need revision. Waiting for updated user stories...")
+    state["review_status"] = "Waiting for Revision"
+    return state
+
 
 # it will run on port 5000 by default
 if __name__ == '__main__':
