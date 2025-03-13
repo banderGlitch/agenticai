@@ -1,15 +1,14 @@
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
-from config import get_groq_llm
+from langchain_core.chains import LLMChain
+from langchain_core.prompts import PromptTemplate
 from flask import Flask, request, jsonify
 import time
-
+import sys
+sys.path.append("../..")  # Add the project root to the path
+from src.config import get_groq_llm
 
 app = Flask(__name__)
-# Temporary storage to keep track of user decisions
-# Important: This is a temporary storage. It will be replaced with a database in the future.
 user_review_store = {} 
-
+revised_stories_store = {}
 
 def get_review_prompt():
     return PromptTemplate(
@@ -46,8 +45,11 @@ def wait_for_user_approval(state):
     while user_review_store.get(user_story_key) == "Pending":
         print("Waiting for user approval...")
         time.sleep(5)  # Polling every 5 seconds
-    
-    return user_approve_review(state, user_review_store[user_story_key])
+    decision = user_review_store[user_story_key]
+    if decision == "Needs Revision":
+        return request_revised_user_stories(state)
+    return user_approve_review(state, decision)
+
 
 @app.route('/review-feedback', methods=['POST'])
 def api_wait_for_approval():
@@ -55,9 +57,20 @@ def api_wait_for_approval():
     review_status = data.get('review_status')
     if review_status not in  ["Approved", "Needs Revision"]:
          return jsonify({"error": "Invalid status. Choose 'Approved' or 'Needs Revision'."}), 400
-    
-    return jsonify(user_approve_review(data, review_status))
+    user_review_store[data["user_stories"]] = review_status
+    return jsonify({"message": "Review decision recorded"})
 
+
+@app.route("/submit-revised-stories", methods=["POST"])
+def api_submit_revised_stories():
+    data = request.json
+    original_story = data.get("original_story")
+    revised_story = data.get("revised_story")
+    if not original_story or not revised_story:
+        return jsonify({"error": "Both 'original_story' and 'revised_story' are required."}), 400
+    revised_stories_store[original_story] = revised_story
+    user_review_store[original_story] = "Pending"
+    return jsonify({"message": "Revised story submitted. Review will be retried."})
 
 
 def user_approve_review(state, user_decision):
@@ -69,10 +82,6 @@ def user_approve_review(state, user_decision):
 
 
 
-
-
-
-
 def request_revised_user_stories(state):
     """
     Function to request revised user stories when the review fails.
@@ -80,7 +89,13 @@ def request_revised_user_stories(state):
     """
     print("User stories need revision. Waiting for updated user stories...")
     state["review_status"] = "Waiting for Revision"
-    return state
+    
+    user_story_key = state["user_stories"]
+    while user_story_key not in revised_stories_store:
+        time.sleep(5)  # Polling until the revised story is submitted
+    state["user_stories"] = revised_stories_store[user_story_key]
+    del revised_stories_store[user_story_key]
+    return review_user_stories(state)  # Retry review process
 
 
 # it will run on port 5000 by default
