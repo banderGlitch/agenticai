@@ -2,138 +2,135 @@ Here is the comprehensive design document for the Tic Tac Toe game project:
 
 **Functional Design**
 
-**1. System Overview**
+### 1. System Overview
 
-The Tic Tac Toe game system is a web-based application that allows two players to play a game of Tic Tac Toe. The system provides an intuitive user interface for players to interact with the game, and it responds to user input in a timely manner. The system determines the winner of the game based on standard Tic Tac Toe rules and displays the winner or a draw if all squares are filled.
+The Tic Tac Toe game system is a web-based application that allows two players to play a game of Tic Tac Toe. The system provides a user-friendly interface for players to make moves, displays the game board, and determines the winner of the game.
 
-**2. User Interfaces**
+### 2. User Interfaces
 
-The system consists of the following screens/pages:
+The system consists of the following user interfaces:
 
-* **Game Board Screen**: A 3x3 grid that displays the game board. Players can take turns marking a square on the grid using a standard keyboard and mouse.
-* **Game Over Screen**: Displays the winner of the game or a draw if all squares are filled.
-* **New Game Screen**: Allows players to start a new game.
+* **Game Board Page**: This is the main page of the application, where players can see the 3x3 game board and make moves. The page displays the current state of the game, including the moves made by each player.
+* **New Game Page**: This page allows players to start a new game. It provides a button to start a new game, which resets the game board and allows players to begin a new game.
+* **Game Outcome Page**: This page displays the outcome of the game, including the winner (if any) and the final state of the game board.
 
-**3. Data Models**
+### 3. Data Models
 
 The system uses the following data models:
 
-* **Game**: Represents a single game of Tic Tac Toe. Attributes:
-	+ id (unique identifier)
-	+ player1 (player 1's mark, either X or O)
-	+ player2 (player 2's mark, either X or O)
-	+ board (3x3 grid representing the game board)
-	+ winner (winner of the game, either player 1, player 2, or draw)
-	+ created_at (timestamp when the game was created)
-	+ updated_at (timestamp when the game was last updated)
-* **Move**: Represents a single move made by a player. Attributes:
-	+ id (unique identifier)
-	+ game_id (foreign key referencing the Game entity)
-	+ player (player who made the move, either player 1 or player 2)
-	+ row (row number of the move, 1-3)
-	+ col (column number of the move, 1-3)
-	+ created_at (timestamp when the move was made)
+* **Game**: Represents a single game of Tic Tac Toe, with attributes:
+	+ `id` (unique identifier)
+	+ `gameBoard` (3x3 array of squares, each representing a move by a player)
+	+ `player1` (player who makes the first move)
+	+ `player2` (player who makes the second move)
+	+ `winner` (the winner of the game, if any)
+* **Move**: Represents a single move made by a player, with attributes:
+	+ `id` (unique identifier)
+	+ `gameId` (foreign key referencing the Game entity)
+	+ `player` (the player who made the move)
+	+ `square` (the square on the game board where the move was made)
 
-**4. Business Logic and Workflows**
+### 4. Business Logic and Workflows
 
-The system's business logic and workflows are as follows:
+The system uses the following business logic and workflows:
 
-* When a player makes a move, the system updates the game board and checks if the game is won or drawn.
-* If the game is won or drawn, the system displays the winner or draw on the Game Over Screen.
-* If the game is not won or drawn, the system allows the next player to make a move.
-* When a player starts a new game, the system creates a new Game entity and initializes the game board.
+* **Game Initialization**: When a new game is started, the system initializes a new Game entity and sets up the game board.
+* **Move Validation**: When a player makes a move, the system validates the move to ensure it is valid (e.g., not trying to mark a square already occupied). If the move is invalid, the system provides feedback to the player.
+* **Game Outcome Determination**: After each move, the system checks if the game is over (i.e., a player has won or all squares are filled and no player has won). If the game is over, the system determines the winner and displays the game outcome.
+* **Game Board Update**: After each move, the system updates the game board to reflect the new state of the game.
 
-**5. Integration Points**
+### 5. Integration Points
 
-The system does not integrate with any external systems or APIs.
+The system does not have any external integration points, as it is a self-contained web-based application.
 
 **Technical Design**
 
-**1. Architecture Overview**
+### 1. Architecture Overview
 
-The system's architecture is a web-based, client-server architecture. The client-side is built using HTML, CSS, and JavaScript, and it communicates with the server-side using RESTful APIs. The server-side is built using a web framework (e.g., Node.js with Express) and it uses a relational database management system (e.g., MySQL) to store game data.
+The system uses a client-server architecture, with a web-based client (browser) communicating with a server-side application. The server-side application uses a RESTful API to handle requests from the client.
 
-**Architecture Diagram:**
-
+Here is a high-level architecture diagram:
 ```
           +---------------+
-          |  Client-side  |
-          |  (HTML, CSS,  |
-          |   JavaScript)  |
+          |  Browser    |
           +---------------+
                   |
-                  |
+                  |  HTTP Requests
                   v
           +---------------+
-          |  Server-side  |
-          |  (Web Framework|
-          |   with RESTful |
-          |   APIs)        |
+          |  Server     |
+          |  (Node.js)  |
           +---------------+
                   |
-                  |
+                  |  RESTful API
                   v
           +---------------+
-          |  Database     |
-          |  (Relational    |
-          |   Database     |
-          |   Management    |
-          |   System)       |
+          |  Database  |
+          |  (MongoDB)  |
           +---------------+
 ```
+### 2. Technology Stack
 
-**2. Technology Stack**
+The system uses the following technologies:
 
-* Front-end: HTML, CSS, JavaScript
-* Back-end: Node.js with Express
-* Database: MySQL
+* **Frontend**: HTML, CSS, JavaScript (using React library)
+* **Backend**: Node.js (using Express framework)
+* **Database**: MongoDB
 
-**3. Component Design**
+### 3. Component Design
 
 The system consists of the following components:
 
-* **GameBoardComponent**: Handles rendering the game board and updating it when a player makes a move.
-* **GameLogicComponent**: Handles the game's business logic, including checking if the game is won or drawn.
-* **APIGateway**: Handles incoming API requests from the client-side and routes them to the appropriate server-side components.
-* **DatabaseAccessComponent**: Handles interactions with the database, including creating, reading, and updating game data.
+* **Game Board Component**: Responsible for rendering the game board and handling user input (moves).
+* **Game Logic Component**: Responsible for validating moves, determining game outcomes, and updating the game board.
+* **API Component**: Responsible for handling RESTful API requests from the client.
+* **Database Component**: Responsible for storing and retrieving game data from the MongoDB database.
 
-**4. Database Schema**
+### 4. Database Schema
 
-The database schema consists of the following tables:
+The system uses the following MongoDB schema:
 
-* **games**: Represents a single game of Tic Tac Toe. Columns:
-	+ id (primary key)
-	+ player1
-	+ player2
-	+ board
-	+ winner
-	+ created_at
-	+ updated_at
-* **moves**: Represents a single move made by a player. Columns:
-	+ id (primary key)
-	+ game_id (foreign key referencing the games table)
-	+ player
-	+ row
-	+ col
-	+ created_at
+* **games** collection:
+	+ `_id` (ObjectId, primary key)
+	+ `gameBoard` (array of 3x3 squares)
+	+ `player1` (string)
+	+ `player2` (string)
+	+ `winner` (string)
+* **moves** collection:
+	+ `_id` (ObjectId, primary key)
+	+ `gameId` (ObjectId, foreign key referencing the games collection)
+	+ `player` (string)
+	+ `square` (integer)
 
-**5. API Specifications**
+### 5. API Specifications
 
-The system provides the following APIs:
+The system provides the following RESTful API endpoints:
 
-* **POST /games**: Creates a new game.
-* **GET /games/:id**: Retrieves a game by ID.
-* **PUT /games/:id**: Updates a game.
-* **POST /games/:id/moves**: Makes a new move in a game.
+* **POST /games**: Creates a new game and returns the game ID.
+* **GET /games/:gameId**: Retrieves the game board for a specific game.
+* **POST /games/:gameId/moves**: Makes a move in a specific game and returns the updated game board.
+* **GET /games/:gameId/outcome**: Retrieves the outcome of a specific game.
 
-**6. Security Considerations**
+### 6. Security Considerations
 
-The system uses HTTPS to encrypt data transmitted between the client-side and server-side. The system also uses input validation and sanitization to prevent SQL injection attacks.
+The system uses the following security measures:
 
-**7. Performance Considerations**
+* **Authentication**: None (the system is a public-facing application and does not require authentication).
+* **Authorization**: None (the system does not have any restricted resources or actions).
+* **Data Encryption**: None (the system does not store sensitive data).
 
-The system is designed to handle multiple games simultaneously without significant performance degradation. The system uses caching to improve performance and reduce the load on the database.
+### 7. Performance Considerations
 
-**8. Deployment Strategy**
+The system is designed to handle a high volume of requests and responses. The following performance considerations are in place:
 
-The system will be deployed on a cloud-based platform (e.g., AWS) using a containerization tool (e.g., Docker). The system will be scalable and can be easily updated or rolled back using a CI/CD pipeline.
+* **Caching**: The system uses caching to reduce the load on the database and improve response times.
+* **Load Balancing**: The system uses load balancing to distribute incoming requests across multiple servers.
+* **Optimized Database Queries**: The system uses optimized database queries to reduce the load on the database.
+
+### 8. Deployment Strategy
+
+The system will be deployed on a cloud-based infrastructure (e.g., AWS) using a containerization platform (e.g., Docker). The deployment strategy includes:
+
+* **Continuous Integration**: The system uses continuous integration to automate testing and deployment.
+* **Continuous Deployment**: The system uses continuous deployment to automate deployment to production.
+* **Monitoring and Logging**: The system uses monitoring and logging tools to track performance and identify issues.

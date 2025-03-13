@@ -1,294 +1,194 @@
-Here is the implementation of the Tic Tac Toe game project based on the provided design documents:
+Here is the implementation of the Tic Tac Toe game project:
 
 **Project Structure (Directory Layout)**
 ```
 tic-tac-toe/
 client/
+components/
+GameBoard.js
+GameLogic.js
+index.js
+containers/
+App.js
+index.js
+public/
 index.html
-styles.css
-script.js
 server/
-app.js
+api/
+games.js
+moves.js
+index.js
 models/
 Game.js
 Move.js
-routes/
-game.js
-move.js
-utils/
-database.js
-apiGateway.js
-config.js
+index.js
+app.js
 package.json
 README.md
 ```
 **Key Files with Complete Code Implementations**
 
-**1. `client/index.html`**
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Tic Tac Toe</title>
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <h1>Tic Tac Toe</h1>
-  <div id="game-board">
-    <table>
-      <tr>
-        <td id="0-0"></td>
-        <td id="0-1"></td>
-        <td id="0-2"></td>
-      </tr>
-      <tr>
-        <td id="1-0"></td>
-        <td id="1-1"></td>
-        <td id="1-2"></td>
-      </tr>
-      <tr>
-        <td id="2-0"></td>
-        <td id="2-1"></td>
-        <td id="2-2"></td>
-      </tr>
-    </table>
-  </div>
-  <button id="new-game">New Game</button>
-  <script src="script.js"></script>
-</body>
-</html>
+**1. `client/components/GameBoard.js`**
 ```
-This file is the client-side HTML file that renders the game board and allows users to interact with it.
+import React, { useState, useEffect } from 'react';
 
-**2. `client/styles.css`**
-```css
-#game-board {
-  border-collapse: collapse;
-}
+const GameBoard = () => {
+  const [gameBoard, setGameBoard] = useState([
+    ['', '', ''],
+    ['', '', ''],
+    ['', '', '']
+  ]);
 
-td {
-  width: 50px;
-  height: 50px;
-  border: 1px solid black;
-  text-align: center;
-  font-size: 24px;
-}
+  const [currentPlayer, setCurrentPlayer] = useState('X');
 
-td:hover {
-  background-color: #ccc;
-}
+  const handleMove = (row, col) => {
+    if (gameBoard[row][col] === '') {
+      const newGameBoard = [...gameBoard];
+      newGameBoard[row][col] = currentPlayer;
+      setGameBoard(newGameBoard);
+      setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X');
+    }
+  };
+
+  return (
+    <div className="game-board">
+      {gameBoard.map((row, rowIndex) => (
+        <div key={rowIndex} className="row">
+          {row.map((cell, colIndex) => (
+            <div key={colIndex} className="cell" onClick={() => handleMove(rowIndex, colIndex)}>
+              {cell}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export default GameBoard;
 ```
-This file is the client-side CSS file that styles the game board.
+This component renders the game board and handles user input (moves).
 
-**3. `client/script.js`**
-```javascript
-const gameBoard = document.getElementById('game-board');
-const newGameButton = document.getElementById('new-game');
-
-let currentPlayer = 'X';
-let gameId = null;
-
-gameBoard.addEventListener('click', (event) => {
-  const row = event.target.parentElement.rowIndex;
-  const col = event.target.cellIndex;
-  makeMove(row, col);
-});
-
-newGameButton.addEventListener('click', () => {
-  startNewGame();
-});
-
-async function startNewGame() {
-  const response = await fetch('/games', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  const gameId = await response.json();
-  console.log(`Started new game with ID ${gameId}`);
-}
-
-async function makeMove(row, col) {
-  const response = await fetch(`/games/${gameId}/moves`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ row, col, player: currentPlayer }),
-  });
-  const move = await response.json();
-  updateGameBoard(move);
-  checkGameStatus();
-}
-
-function updateGameBoard(move) {
-  const cell = document.getElementById(`${move.row}-${move.col}`);
-  cell.textContent = move.player;
-}
-
-async function checkGameStatus() {
-  const response = await fetch(`/games/${gameId}`);
-  const game = await response.json();
-  if (game.winner) {
-    alert(`Game over! Winner is ${game.winner}`);
-  }
-}
+**2. `client/containers/App.js`**
 ```
-This file is the client-side JavaScript file that handles user interactions with the game board and communicates with the server-side API.
+import React from 'react';
+import GameBoard from '../components/GameBoard';
 
-**4. `server/app.js`**
-```javascript
-const express = require('express');
-const app = express();
-const apiGateway = require('./utils/apiGateway');
-const gameLogic = require('./utils/gameLogic');
+const App = () => {
+  return (
+    <div className="app">
+      <GameBoard />
+    </div>
+  );
+};
 
-app.use(express.json());
+export default App;
+```
+This component is the main application container and renders the game board.
 
-app.post('/games', async (req, res) => {
-  const game = await apiGateway.createGame();
+**3. `server/api/games.js`**
+```
+import express from 'express';
+import mongoose from 'mongoose';
+
+const router = express.Router();
+const Game = mongoose.model('Game');
+
+router.post('/', async (req, res) => {
+  const game = new Game();
+  await game.save();
   res.json({ gameId: game.id });
 });
 
-app.get('/games/:id', async (req, res) => {
-  const gameId = req.params.id;
-  const game = await apiGateway.getGame(gameId);
-  res.json(game);
+router.get('/:gameId', async (req, res) => {
+  const gameId = req.params.gameId;
+  const game = await Game.findById(gameId);
+  res.json({ gameBoard: game.gameBoard });
 });
 
-app.put('/games/:id', async (req, res) => {
-  const gameId = req.params.id;
-  const game = await apiGateway.updateGame(gameId, req.body);
-  res.json(game);
+export default router;
+```
+This API endpoint handles creating a new game and retrieving the game board for a specific game.
+
+**4. `server/api/moves.js`**
+```
+import express from 'express';
+import mongoose from 'mongoose';
+
+const router = express.Router();
+const Move = mongoose.model('Move');
+
+router.post('/:gameId', async (req, res) => {
+  const gameId = req.params.gameId;
+  const move = new Move({ gameId, player: req.body.player, square: req.body.square });
+  await move.save();
+  res.json({ message: 'Move made successfully' });
 });
 
-app.post('/games/:id/moves', async (req, res) => {
-  const gameId = req.params.id;
-  const move = await apiGateway.makeMove(gameId, req.body);
-  res.json(move);
+export default router;
+```
+This API endpoint handles making a move in a specific game.
+
+**5. `server/models/Game.js`**
+```
+import mongoose from 'mongoose';
+
+const gameSchema = new mongoose.Schema({
+  gameBoard: [
+    [String],
+    [String],
+    [String]
+  ],
+  player1: String,
+  player2: String,
+  winner: String
 });
+
+const Game = mongoose.model('Game', gameSchema);
+
+export default Game;
+```
+This model defines the Game entity.
+
+**6. `server/models/Move.js`**
+```
+import mongoose from 'mongoose';
+
+const moveSchema = new mongoose.Schema({
+  gameId: { type: mongoose.Schema.Types.ObjectId, ref: 'Game' },
+  player: String,
+  square: Number
+});
+
+const Move = mongoose.model('Move', moveSchema);
+
+export default Move;
+```
+This model defines the Move entity.
+
+**7. `server/app.js`**
+```
+import express from 'express';
+import mongoose from 'mongoose';
+import gamesRouter from './api/games';
+import movesRouter from './api/moves';
+
+const app = express();
+
+app.use(express.json());
+app.use('/api/games', gamesRouter);
+app.use('/api/moves', movesRouter);
+
+mongoose.connect('mongodb://localhost/tic-tac-toe', { useNewUrlParser: true, useUnifiedTopology: true });
 
 app.listen(3000, () => {
   console.log('Server started on port 3000');
 });
 ```
-This file is the server-side Node.js file that sets up the Express.js server and defines the API endpoints.
+This is the main server file that sets up the Express app and API endpoints.
 
-**5. `server/models/Game.js`**
-```javascript
-class Game {
-  constructor(id, player1, player2, board, winner, createdAt, updatedAt) {
-    this.id = id;
-    this.player1 = player1;
-    this.player2 = player2;
-    this.board = board;
-    this.winner = winner;
-    this.createdAt = createdAt;
-    this.updatedAt = updatedAt;
-  }
-}
-
-module.exports = Game;
+**8. `package.json`**
 ```
-This file is the server-side model for the Game entity.
-
-**6. `server/models/Move.js`**
-```javascript
-class Move {
-  constructor(id, gameId, player, row, col, createdAt) {
-    this.id = id;
-    this.gameId = gameId;
-    this.player = player;
-    this.row = row;
-    this.col = col;
-    this.createdAt = createdAt;
-  }
-}
-
-module.exports = Move;
-```
-This file is the server-side model for the Move entity.
-
-**7. `server/utils/apiGateway.js`**
-```javascript
-const db = require('./database');
-
-async function createGame() {
-  const game = new Game(null, 'X', 'O', [['', '', ''], ['', '', ''], ['', '', '']], null, new Date(), new Date());
-  await db.createGame(game);
-  return game;
-}
-
-async function getGame(gameId) {
-  const game = await db.getGame(gameId);
-  return game;
-}
-
-async function updateGame(gameId, updates) {
-  const game = await db.getGame(gameId);
-  game.board = updates.board;
-  game.winner = updates.winner;
-  await db.updateGame(game);
-  return game;
-}
-
-async function makeMove(gameId, move) {
-  const game = await db.getGame(gameId);
-  const newMove = new Move(null, gameId, move.player, move.row, move.col, new Date());
-  await db.createMove(newMove);
-  game.board[move.row][move.col] = move.player;
-  await db.updateGame(game);
-  return newMove;
-}
-
-module.exports = { createGame, getGame, updateGame, makeMove };
-```
-This file is the server-side API gateway that interacts with the database and performs business logic operations.
-
-**8. `server/utils/database.js`**
-```javascript
-const mysql = require('mysql');
-
-const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: 'password',
-  database: 'tic_tac_toe',
-});
-
-db.connect();
-
-async function createGame(game) {
-  const query = `INSERT INTO games (player1, player2, board, winner, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`;
-  const values = [game.player1, game.player2, JSON.stringify(game.board), game.winner, game.createdAt, game.updatedAt];
-  await db.query(query, values);
-  return game;
-}
-
-async function getGame(gameId) {
-  const query = `SELECT * FROM games WHERE id = ?`;
-  const values = [gameId];
-  const result = await db.query(query, values);
-  return result[0];
-}
-
-async function updateGame(game) {
-  const query = `UPDATE games SET board = ?, winner = ?, updated_at = ? WHERE id = ?`;
-  const values = [JSON.stringify(game.board), game.winner, game.updatedAt, game.id];
-  await db.query(query, values);
-  return game;
-}
-
-async function createMove(move) {
-  const query = `INSERT INTO moves (game_id, player, row, col, created_at) VALUES (?, ?, ?, ?, ?)`;
-  const values = [move.gameId, move.player, move.row, move.col, move.createdAt];
-  await db.query(query, values);
-  return move;
-}
-
-module.exports = { createGame, getGame, updateGame, createMove };
-```
-This file is the server-side database utility that interacts with the MySQL database.
-
-**9. `package.json`**
-```json
 {
   "name": "tic-tac-toe",
   "version": "1.0.0",
@@ -297,28 +197,28 @@ This file is the server-side database utility that interacts with the MySQL data
   },
   "dependencies": {
     "express": "^4.17.1",
-    "mysql": "^2.18.1"
+    "mongoose": "^5.9.20",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2"
   }
 }
 ```
-This file is the package.json file that defines the project dependencies and scripts.
+This file lists the project dependencies and scripts.
 
-**10. `README.md`**
+**9. `README.md`**
 ```
-Tic Tac Toe Game
-================
+# Tic Tac Toe Game
 
-To run the game:
+## Setup
 
-1. Install dependencies: `npm install`
-2. Start the server: `npm start`
-3. Open a web browser and navigate to `http://localhost:3000`
+1. Clone the repository: `git clone https://github.com/username/tic-tac-toe.git`
+2. Install dependencies: `npm install`
+3. Start the server: `npm start`
 
-To play the game:
+## Usage
 
-1. Click on a cell to make a move.
-2. Click the "New Game" button to start a new game.
+1. Open `http://localhost:3000` in your browser to play the game.
 ```
-This file is the README.md file that provides instructions on how to run and play the game.
+This file provides setup and usage instructions for the project.
 
-Note that this implementation assumes a MySQL database is set up and configured on the local machine. You may need to modify the `database.js` file to connect to a different database or adjust the schema to match your specific database setup.
+Note that this implementation uses a simple MongoDB schema and does not include caching, load balancing, or optimized database queries as mentioned in the design document. Those features can be added in a future iteration of the project.
