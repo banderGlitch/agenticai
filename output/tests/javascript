@@ -1,0 +1,28 @@
+describe('Game Flow', () => {
+  it('executes correctly', () => {
+    // Open the game in a web browser
+    const gameContainer = document.getElementById('game-container');
+    // Verify that the game grid is rendered correctly
+    expect(gameContainer.innerHTML).toMatchSnapshot();
+    // Verify that the snake is rendered correctly
+    const snakeElement = gameContainer.querySelector('.snake-body');
+    expect(snakeElement).toBeDefined();
+    // Verify that food is generated randomly
+    const foodElement = gameContainer.querySelector('.food');
+    expect(foodElement).toBeDefined();
+    // Move the snake using keyboard input
+    const event = { key: 'ArrowUp' };
+    document.dispatchEvent(event);
+    // Verify that the snake moves correctly
+    expect(snakeElement.style.top).toBe('40px');
+    // Eat food and verify that snake length increases
+    event.key = 'ArrowRight';
+    document.dispatchEvent(event);
+    expect(snakeElement.style.left).toBe('60px');
+    // Verify that game over message is displayed when snake collides with grid boundary or itself
+    event.key = 'ArrowDown';
+    document.dispatchEvent(event);
+    expect(alert).toHaveBeenCalledTimes(1);
+    expect(alert).toHaveBeenCalledWith('Game Over!');
+  });
+});

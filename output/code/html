@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tic Tac Toe</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>Tic Tac Toe</h1>
+  <div id="game-board">
+    <table>
+      <tr>
+        <td id="0-0"></td>
+        <td id="0-1"></td>
+        <td id="0-2"></td>
+      </tr>
+      <tr>
+        <td id="1-0"></td>
+        <td id="1-1"></td>
+        <td id="1-2"></td>
+      </tr>
+      <tr>
+        <td id="2-0"></td>
+        <td id="2-1"></td>
+        <td id="2-2"></td>
+      </tr>
+    </table>
+  </div>
+  <button id="new-game">New Game</button>
+  <script src="script.js"></script>
+</body>
+</html>

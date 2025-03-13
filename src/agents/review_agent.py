@@ -1,4 +1,4 @@
-from langchain_core.chains import LLMChain
+from langchain.chains import LLMChain
 from langchain_core.prompts import PromptTemplate
 import sys
 sys.path.append("../..")  # Add the project root to the path

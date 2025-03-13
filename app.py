@@ -1,22 +1,60 @@
-import streamlit as st  # type: ignore
+import streamlit as st
 import os
 import json
-import time
-import networkx as nx
-import matplotlib.pyplot as plt # type: ignore
-from PIL import Image
-from streamlit_agraph import agraph, Node, Edge, Config # type: ignore
 from typing import Dict, Any, List
 from main import create_sdlc_graph, SDLCState
-from src.utils.visualize import visualize_graph, export_graph_json, track_execution
 
 # Set page configuration
 st.set_page_config(
-    page_title="SDLC Agents",
+    page_title="SDLC Agents - Simple Workflow",
     page_icon="🔄",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# Custom CSS to improve spacing and reduce congestion
+st.markdown("""
+<style>
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+    .stTabs [data-baseweb="tab-panel"] {
+        padding-top: 1rem;
+    }
+    .workflow-step {
+        padding: 8px;
+        border-radius: 5px;
+        margin-bottom: 5px;
+        display: flex;
+        align-items: center;
+    }
+    .step-number {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 10px;
+        flex-shrink: 0;
+    }
+    .step-connector {
+        width: 2px;
+        height: 10px;
+        background-color: #ccc;
+        margin-left: 12px;
+    }
+    .main-header {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+    .sub-header {
+        font-size: 1.2rem;
+        margin-bottom: 0.5rem;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Initialize session state
 if "initialized" not in st.session_state:
@@ -26,359 +64,313 @@ if "initialized" not in st.session_state:
     st.session_state.current_step = None
     st.session_state.workflow_state = None
     st.session_state.execution_history = {}
-    st.session_state.graph = None
-    st.session_state.graph_data = None
-    st.session_state.workflow_started = False
-    st.session_state.workflow_completed = False
-    st.session_state.waiting_for_input = False
-    st.session_state.input_type = None
-    st.session_state.step_outputs = {}
+    st.session_state.step_number = 0
+    st.session_state.total_steps = 7  # Total number of steps in our workflow
 
-# Function to initialize the workflow
+# Define the steps in our workflow for display purposes
+WORKFLOW_STEPS = [
+    "Requirements Gathering",
+    "User Story Generation",
+    "Design Creation",
+    "Code Generation",
+    "Test Case Writing",
+    "QA Testing",
+    "Deployment"
+]
+
 def initialize_workflow():
-    if st.session_state.project_name:
-        # Initialize state
-        initial_state = SDLCState(
-            project_name=st.session_state.project_name,
-            requirements=None,
-            user_stories=None,
-            design_documents=None,
-            code=None,
-            test_cases=None,
-            deployment_status=None,
-            monitoring_data=None,
-            raw_requirements_input=st.session_state.requirements if st.session_state.requirements else None
-        )
-        
-        # Create the workflow graph
+    """Initialize the workflow with the project name and requirements"""
+    if not st.session_state.project_name:
+        st.error("Please enter a project name")
+        return
+    
+    # Create initial state
+    initial_state = SDLCState(
+        project_name=st.session_state.project_name,
+        requirements=st.session_state.requirements,
+        user_stories=None,
+        design_documents=None,
+        code=None,
+        test_cases=None,
+        qa_results=None,
+        deployment_status=None
+    )
+    
+    # Create the workflow graph
+    try:
         st.session_state.graph = create_sdlc_graph()
         
-        # Get graph data for visualization
-        try:
-            # Create output directory if it doesn't exist
-            os.makedirs("output", exist_ok=True)
-            
-            # Generate visualization
-            visualize_graph(st.session_state.graph)
-            export_graph_json(st.session_state.graph)
-            
-            # Load graph data
-            with open("output/workflow_graph.json", "r") as f:
-                st.session_state.graph_data = json.load(f)
-        except Exception as e:
-            st.error(f"Error generating graph visualization: {e}")
+        # Create the workflow iterator
+        # The stream method returns (node, state) tuples
+        st.session_state.workflow_iterator = st.session_state.graph.stream(initial_state)
         
-        # Initialize workflow state
+        # Set initial state
+        st.session_state.current_step = "START"
         st.session_state.workflow_state = initial_state
         st.session_state.initialized = True
-        st.session_state.workflow_started = False
-        st.session_state.workflow_completed = False
+        st.session_state.step_number = 0
         st.session_state.execution_history = {}
-        st.session_state.current_step = None
-        st.session_state.step_outputs = {}
         
-        st.success("Workflow initialized successfully!")
-    else:
-        st.error("Please enter a project name.")
+        st.success("Workflow initialized! Click 'Run Next Step' to begin the SDLC process.")
+    except Exception as e:
+        st.error(f"Error initializing workflow: {e}")
+        import traceback
+        st.error(traceback.format_exc())
 
-# Function to run the next step in the workflow
 def run_next_step():
+    """Run the next step in the workflow"""
     if not st.session_state.initialized:
-        st.error("Please initialize the workflow first.")
+        st.error("Please initialize the workflow first")
         return
-    
-    if st.session_state.workflow_completed:
-        st.info("Workflow has already completed.")
-        return
-    
-    if st.session_state.waiting_for_input:
-        st.warning("Please provide the required input before continuing.")
-        return
-    
-    # Start or continue the workflow
-    if not st.session_state.workflow_started:
-        st.session_state.workflow_started = True
-        # Create a generator for the workflow
-        st.session_state.workflow_generator = st.session_state.graph.stream(st.session_state.workflow_state)
     
     try:
-        # Get the next step
-        step, state = next(st.session_state.workflow_generator)
+        # Get the next step from the iterator
+        result = next(st.session_state.workflow_iterator)
         
-        if step.name == "__end__":
-            st.session_state.workflow_completed = True
-            st.session_state.current_step = "Completed"
+        # Handle AddableUpdatesDict format from LangGraph
+        if hasattr(result, 'keys') and len(result) > 0:
+            # This is a dictionary-like object with node names as keys
+            # Get the first key as the step name
+            step_name = list(result.keys())[0]
             
-            # Save execution history
-            try:
-                track_execution(st.session_state.execution_history)
-                st.success("Execution history saved to output/execution_history.json")
-            except Exception as e:
-                st.error(f"Error saving execution history: {e}")
+            # Get the state from the value
+            state_updates = result[step_name]
             
-            st.balloons()
-            st.success("SDLC Workflow Completed!")
-        else:
-            # Update current step and state
-            st.session_state.current_step = step.name
+            # Update the current state with the new values
+            if isinstance(state_updates, dict):
+                # Create a new state by updating the current one
+                current_state = st.session_state.workflow_state or {}
+                state = {**current_state, **state_updates}
+            else:
+                # If it's not a dict, just use it as is
+                state = state_updates
+                
+            # Update session state
+            st.session_state.current_step = step_name
             st.session_state.workflow_state = state
             
-            # Store state in execution history
-            st.session_state.execution_history[step.name] = dict(state)
+            # Store in execution history
+            st.session_state.execution_history[step_name] = dict(state) if isinstance(state, dict) else state
             
-            # Check if we need user input for the next step
-            if "review" in step.name and state.get("review_status") == "Pending User Approval":
-                st.session_state.waiting_for_input = True
-                st.session_state.input_type = "review"
-            elif step.name == "gather_requirements" and not state.get("raw_requirements_input"):
-                st.session_state.waiting_for_input = True
-                st.session_state.input_type = "requirements"
+            # Increment step number
+            st.session_state.step_number += 1
+            
+            # Display success message
+            step_index = min(st.session_state.step_number - 1, len(WORKFLOW_STEPS) - 1)
+            step_name_display = WORKFLOW_STEPS[step_index] if step_index >= 0 else step_name
+            st.success(f"✅ Completed step: {step_name_display}")
+            
+        elif isinstance(result, tuple) and len(result) == 2:
+            # Standard format: (node, state)
+            step, state = result
+            step_name = getattr(step, 'name', str(step))
+            
+            # Update session state
+            st.session_state.current_step = step_name
+            st.session_state.workflow_state = state
+            
+            # Store in execution history if it's a dictionary
+            if isinstance(state, dict):
+                st.session_state.execution_history[step_name] = dict(state)
+            
+            # Increment step number if not at the end
+            if step_name != "__end__":
+                st.session_state.step_number += 1
+            
+            # If we've reached the end, show a completion message
+            if step_name == "__end__":
+                st.balloons()
+                st.success("🎉 SDLC Workflow Completed! Your software development lifecycle is complete.")
             else:
-                st.session_state.waiting_for_input = False
-                st.session_state.input_type = None
+                # Make sure we don't go out of bounds
+                step_index = min(st.session_state.step_number - 1, len(WORKFLOW_STEPS) - 1)
+                step_name_display = WORKFLOW_STEPS[step_index] if step_index >= 0 else step_name
+                st.success(f"✅ Completed step: {step_name_display}")
+        else:
+            # Unknown format
+            st.error(f"Unexpected result format from workflow: {result}")
+            return
             
-            # Store step outputs for display
-            for key, value in state.items():
-                if value is not None and key not in st.session_state.step_outputs:
-                    st.session_state.step_outputs[key] = value
-    
     except StopIteration:
-        st.session_state.workflow_completed = True
-        st.session_state.current_step = "Completed"
+        st.info("Workflow has completed. No more steps to run.")
         st.balloons()
-        st.success("SDLC Workflow Completed!")
+        st.success("🎉 SDLC Workflow Completed! Your software development lifecycle is complete.")
     except Exception as e:
-        st.error(f"Error during workflow execution: {e}")
+        st.error(f"Error running step: {e}")
+        import traceback
+        st.error(traceback.format_exc())
 
-# Function to handle user input for reviews
-def handle_review_input(decision):
-    if decision == "Approved" or decision == "Needs Revision":
-        # Update the state based on the decision
-        if "review_user_stories" in st.session_state.current_step:
-            from src.agents.review_agent import user_approve_review
-            st.session_state.workflow_state = user_approve_review(st.session_state.workflow_state, decision)
-        elif "review_design" in st.session_state.current_step:
-            st.session_state.workflow_state["design_review_status"] = decision
-        elif "review_code" in st.session_state.current_step:
-            st.session_state.workflow_state["code_review_status"] = decision
-        elif "review_test_cases" in st.session_state.current_step:
-            st.session_state.workflow_state["test_review_status"] = decision
-        
-        # Continue workflow
-        st.session_state.waiting_for_input = False
-        st.session_state.input_type = None
-        st.experimental_rerun()
-    else:
-        st.error("Invalid decision. Please select 'Approved' or 'Needs Revision'.")
-
-# Function to handle requirements input
 def handle_requirements_input(requirements):
-    if requirements:
-        st.session_state.workflow_state["raw_requirements_input"] = requirements
-        st.session_state.waiting_for_input = False
-        st.session_state.input_type = None
-        st.experimental_rerun()
-    else:
-        st.error("Please enter requirements.")
+    """Handle the requirements input from the user"""
+    st.session_state.requirements = requirements
 
-# Function to visualize the workflow graph
-def visualize_workflow_graph():
-    if st.session_state.graph_data:
-        # Create nodes and edges for agraph
-        nodes = []
-        edges = []
-        
-        # Add nodes
-        for node in st.session_state.graph_data["nodes"]:
-            color = "#1f77b4"  # Default color
-            
-            # Highlight current step
-            if node == st.session_state.current_step:
-                color = "#d62728"  # Red for current step
-            # Highlight completed steps
-            elif node in st.session_state.execution_history:
-                color = "#2ca02c"  # Green for completed steps
-            
-            nodes.append(Node(id=node, label=node, color=color))
-        
-        # Add edges
-        for edge in st.session_state.graph_data["edges"]:
-            source = edge["source"]
-            target = edge["target"]
-            edges.append(Edge(source=source, target=target))
-        
-        # Configure the graph
-        config = Config(
-            width=700,
-            height=500,
-            directed=True,
-            physics=True,
-            hierarchical=False,
-        )
-        
-        # Render the graph
-        return agraph(nodes=nodes, edges=edges, config=config)
-    else:
-        try:
-            # Try to display the static image
-            image = Image.open("output/workflow_graph.png")
-            return st.image(image, caption="SDLC Workflow Graph", use_column_width=True)
-        except:
-            st.warning("Workflow graph visualization not available.")
-            return None
-
-# Main app layout
-def main():
-    st.title("🔄 SDLC Agents - AI-Powered Software Development Lifecycle")
+def render_compact_workflow():
+    """Render a more compact workflow diagram"""
+    # Create a horizontal layout for the workflow steps
+    cols = st.columns(len(WORKFLOW_STEPS))
     
-    # Sidebar
+    for i, (col, step) in enumerate(zip(cols, WORKFLOW_STEPS)):
+        with col:
+            # Determine step status
+            if i < st.session_state.step_number:
+                status = "✅"
+                bg_color = "#e6f4ea"  # Light green
+                text_color = "#137333"  # Dark green
+            elif i == st.session_state.step_number:
+                status = "🔄"
+                bg_color = "#fef7e0"  # Light yellow
+                text_color = "#b06000"  # Dark yellow/orange
+            else:
+                status = "⏳"
+                bg_color = "#f8f9fa"  # Light gray
+                text_color = "#5f6368"  # Dark gray
+            
+            # Render step with number and status
+            st.markdown(f"""
+            <div style="
+                background-color: {bg_color};
+                color: {text_color};
+                padding: 8px 4px;
+                border-radius: 4px;
+                text-align: center;
+                height: 100%;
+                font-size: 0.8rem;
+            ">
+                <div style="font-weight: bold;">{i+1}. {status}</div>
+                <div>{step.split()[0]}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+def main():
+    """Main function for the Streamlit app"""
+    # Title with reduced size
+    st.markdown('<h1 style="font-size: 1.8rem;">🔄 SDLC Agents - Software Development Workflow</h1>', unsafe_allow_html=True)
+    
+    # Sidebar for project setup
     with st.sidebar:
-        st.header("Workflow Control")
+        st.markdown('<h2 class="main-header">Project Setup</h2>', unsafe_allow_html=True)
         
-        # Project setup
-        st.subheader("Project Setup")
-        project_name = st.text_input("Project Name", key="project_name_input", 
-                                     value=st.session_state.project_name)
-        
-        requirements = st.text_area("Project Requirements", key="requirements_input", 
-                                   value=st.session_state.requirements,
-                                   help="Enter the requirements for your project. Leave blank to enter during workflow.")
-        
-        if st.button("Initialize Workflow"):
+        # Project name input
+        st.markdown('<h3 class="sub-header">Project Name</h3>', unsafe_allow_html=True)
+        project_name = st.text_input("Enter your project name", value=st.session_state.project_name, label_visibility="collapsed")
+        if project_name != st.session_state.project_name:
             st.session_state.project_name = project_name
-            st.session_state.requirements = requirements
+        
+        # Project requirements input
+        st.markdown('<h3 class="sub-header">Project Requirements</h3>', unsafe_allow_html=True)
+        requirements = st.text_area("Describe what you want to build", 
+                                   value=st.session_state.requirements, 
+                                   height=150,
+                                   placeholder="Example: A snake game with score tracking and multiple difficulty levels",
+                                   label_visibility="collapsed")
+        if requirements != st.session_state.requirements:
+            handle_requirements_input(requirements)
+        
+        # Initialize workflow button
+        if st.button("Initialize Workflow", use_container_width=True):
             initialize_workflow()
         
-        # Workflow control
-        st.subheader("Workflow Control")
-        
-        if st.button("Run Next Step", disabled=not st.session_state.initialized or st.session_state.workflow_completed):
-            run_next_step()
-        
-        if st.button("Run Complete Workflow", disabled=not st.session_state.initialized or st.session_state.workflow_completed):
-            # Run until completion or until user input is required
-            while not st.session_state.workflow_completed and not st.session_state.waiting_for_input:
+        # Workflow control section
+        if st.session_state.initialized:
+            st.markdown('<h2 class="main-header">Workflow Control</h2>', unsafe_allow_html=True)
+            if st.button("Run Next Step", use_container_width=True):
                 run_next_step()
-            st.experimental_rerun()
-        
-        # Workflow status
-        st.subheader("Workflow Status")
-        st.write(f"Current Step: {st.session_state.current_step if st.session_state.current_step else 'Not started'}")
-        st.write(f"Status: {'Completed' if st.session_state.workflow_completed else 'In Progress' if st.session_state.workflow_started else 'Not Started'}")
     
-    # Main content area - two columns
-    col1, col2 = st.columns([3, 2])
-    
-    # Left column - Workflow visualization and user input
-    with col1:
-        st.header("SDLC Workflow")
+    # Main content area
+    if st.session_state.initialized:
+        # Compact description
+        st.markdown("""
+        <div style="font-size: 0.9rem; color: #5f6368; margin-bottom: 1rem;">
+            This app demonstrates a simplified Software Development Life Cycle (SDLC) workflow using AI agents.
+        </div>
+        """, unsafe_allow_html=True)
         
-        # Workflow visualization
-        visualize_workflow_graph()
+        # Progress bar
+        progress = min(st.session_state.step_number / st.session_state.total_steps, 1.0)
+        st.progress(progress)
         
-        # User input section
-        if st.session_state.waiting_for_input:
-            st.header("User Input Required")
-            
-            if st.session_state.input_type == "review":
-                st.subheader(f"Review: {st.session_state.current_step}")
-                
-                # Display review feedback
-                if "review_feedback" in st.session_state.workflow_state:
-                    st.text_area("Review Feedback", value=st.session_state.workflow_state["review_feedback"], height=200, disabled=True)
-                
-                # Review decision
-                decision = st.radio("Decision", ["Approved", "Needs Revision"])
-                
-                if st.button("Submit Decision"):
-                    handle_review_input(decision)
-            
-            elif st.session_state.input_type == "requirements":
-                st.subheader("Enter Project Requirements")
-                requirements = st.text_area("Requirements", height=200)
-                
-                if st.button("Submit Requirements"):
-                    handle_requirements_input(requirements)
-    
-    # Right column - Step outputs and artifacts
-    with col2:
-        st.header("Artifacts & Outputs")
+        # Compact workflow diagram
+        render_compact_workflow()
         
-        # Display step outputs in tabs
-        if st.session_state.step_outputs:
-            tabs = st.tabs(["Requirements", "User Stories", "Design", "Code", "Tests", "Deployment"])
-            
-            # Requirements tab
-            with tabs[0]:
-                if "requirements" in st.session_state.step_outputs:
-                    st.subheader("Project Requirements")
-                    if isinstance(st.session_state.step_outputs["requirements"], dict):
-                        st.json(st.session_state.step_outputs["requirements"])
-                    else:
-                        st.text_area("Requirements", value=st.session_state.step_outputs["requirements"], height=300, disabled=True)
-                else:
-                    st.info("Requirements not generated yet.")
-            
-            # User Stories tab
-            with tabs[1]:
-                if "user_stories" in st.session_state.step_outputs:
-                    st.subheader("User Stories")
-                    st.text_area("User Stories", value=st.session_state.step_outputs["user_stories"], height=300, disabled=True)
-                    
-                    if "review_feedback" in st.session_state.step_outputs:
-                        st.subheader("Review Feedback")
-                        st.text_area("Feedback", value=st.session_state.step_outputs["review_feedback"], height=150, disabled=True)
-                else:
-                    st.info("User stories not generated yet.")
-            
-            # Design tab
-            with tabs[2]:
-                if "design_documents" in st.session_state.step_outputs:
-                    st.subheader("Design Documents")
-                    st.text_area("Design", value=st.session_state.step_outputs["design_documents"], height=300, disabled=True)
-                    
-                    if "design_review_feedback" in st.session_state.step_outputs:
-                        st.subheader("Design Review Feedback")
-                        st.text_area("Feedback", value=st.session_state.step_outputs["design_review_feedback"], height=150, disabled=True)
-                else:
-                    st.info("Design documents not generated yet.")
-            
-            # Code tab
-            with tabs[3]:
-                if "code" in st.session_state.step_outputs:
-                    st.subheader("Generated Code")
-                    st.text_area("Code", value=st.session_state.step_outputs["code"], height=300, disabled=True)
-                    
-                    if "code_review_feedback" in st.session_state.step_outputs:
-                        st.subheader("Code Review Feedback")
-                        st.text_area("Feedback", value=st.session_state.step_outputs["code_review_feedback"], height=150, disabled=True)
-                else:
-                    st.info("Code not generated yet.")
-            
-            # Tests tab
-            with tabs[4]:
-                if "test_cases" in st.session_state.step_outputs:
-                    st.subheader("Test Cases")
-                    st.text_area("Tests", value=st.session_state.step_outputs["test_cases"], height=300, disabled=True)
-                    
-                    if "qa_results" in st.session_state.step_outputs:
-                        st.subheader("QA Results")
-                        st.text_area("Results", value=st.session_state.step_outputs["qa_results"], height=150, disabled=True)
-                else:
-                    st.info("Test cases not generated yet.")
-            
-            # Deployment tab
-            with tabs[5]:
-                if "deployment_plan" in st.session_state.step_outputs:
-                    st.subheader("Deployment Plan")
-                    st.text_area("Plan", value=st.session_state.step_outputs["deployment_plan"], height=300, disabled=True)
-                    
-                    if "deployment_status" in st.session_state.step_outputs:
-                        st.subheader("Deployment Status")
-                        st.success(st.session_state.step_outputs["deployment_status"])
-                else:
-                    st.info("Deployment plan not generated yet.")
+        # Tabs for artifacts
+        st.markdown('<h2 style="font-size: 1.3rem; margin-top: 1rem;">Project Artifacts</h2>', unsafe_allow_html=True)
+        
+        # Display the current state in tabs
+        state = st.session_state.workflow_state
+        
+        # Create tabs for different artifacts
+        tabs = st.tabs([
+            "Requirements", 
+            "User Stories", 
+            "Design", 
+            "Code", 
+            "Tests", 
+            "QA", 
+            "Deployment"
+        ])
+        
+        # Requirements tab
+        with tabs[0]:
+            if state.get("requirements"):
+                st.text_area("Requirements", value=state["requirements"], height=300, disabled=True, label_visibility="collapsed")
+            else:
+                st.info("Requirements not generated yet.")
+        
+        # User Stories tab
+        with tabs[1]:
+            if state.get("user_stories"):
+                st.text_area("User Stories", value=state["user_stories"], height=300, disabled=True, label_visibility="collapsed")
+            else:
+                st.info("User stories not generated yet.")
+        
+        # Design Documents tab
+        with tabs[2]:
+            if state.get("design_documents"):
+                st.text_area("Design", value=state["design_documents"], height=300, disabled=True, label_visibility="collapsed")
+            else:
+                st.info("Design documents not generated yet.")
+        
+        # Code tab
+        with tabs[3]:
+            if state.get("code"):
+                st.code(state["code"])
+            else:
+                st.info("Code not generated yet.")
+        
+        # Tests tab
+        with tabs[4]:
+            if state.get("test_cases"):
+                st.text_area("Tests", value=state["test_cases"], height=300, disabled=True, label_visibility="collapsed")
+            else:
+                st.info("Test cases not generated yet.")
+        
+        # QA Results tab
+        with tabs[5]:
+            if state.get("qa_results"):
+                st.text_area("QA", value=state["qa_results"], height=300, disabled=True, label_visibility="collapsed")
+            else:
+                st.info("QA results not generated yet.")
+        
+        # Deployment tab
+        with tabs[6]:
+            if state.get("deployment_status"):
+                st.text_area("Deployment", value=state["deployment_status"], height=300, disabled=True, label_visibility="collapsed")
+            else:
+                st.info("Deployment status not generated yet.")
+    else:
+        # Welcome message for users who haven't initialized yet
+        st.markdown("""
+        <div style="padding: 2rem; text-align: center; background-color: #f8f9fa; border-radius: 10px;">
+            <h2>Welcome to SDLC Agents</h2>
+            <p>This app demonstrates a simplified Software Development Life Cycle workflow using AI agents.</p>
+            <p>To get started:</p>
+            <ol style="text-align: left; display: inline-block;">
+                <li>Enter a project name in the sidebar</li>
+                <li>Describe your project requirements</li>
+                <li>Click "Initialize Workflow" to begin</li>
+            </ol>
+        </div>
+        """, unsafe_allow_html=True)
 
-# Run the app
 if __name__ == "__main__":
     main() 

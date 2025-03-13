@@ -4,8 +4,7 @@ from langchain_community.embeddings import OpenAIEmbeddings
 from dotenv import load_dotenv
 
 import os
-from langchain_community.llms import Groq
-from langchain_community.chat_models import ChatGroq
+from langchain_groq import ChatGroq
 
 load_dotenv()  
 
@@ -36,9 +35,9 @@ def get_groq_llm():
     if not api_key:
         raise ValueError("GROQ_API_KEY environment variable not set")
     
-    return Groq(
+    return ChatGroq(
         api_key=api_key,
-        model_name="llama3-70b-8192"  # You can change this to your preferred model
+        model="llama3-70b-8192"  # You can change this to your preferred model
     )
 
 def get_groq_chat():
@@ -51,7 +50,7 @@ def get_groq_chat():
     
     return ChatGroq(
         api_key=api_key,
-        model_name="llama3-70b-8192"  # You can change this to your preferred model
+        model="llama3-70b-8192"  # You can change this to your preferred model
     )
 
 # ## LangSmith Client

@@ -1,4 +1,4 @@
-from langchain_core.chains import LLMChain
+from langchain.chains import LLMChain
 from langchain_core.prompts import PromptTemplate
 import sys
 import os
@@ -30,11 +30,11 @@ def gather_requirements(state):
     """
     Gather and process user requirements
     """
-    print("Please describe your project requirements:")
-    user_input = input("> ")
-    
-    # Save raw user input
-    state["raw_requirements_input"] = user_input
+    # Use requirements from state if available, otherwise prompt user
+    user_input = state.get("requirements")
+    if not user_input:
+        print("Please describe your project requirements:")
+        user_input = input("> ")
     
     # Process requirements with LLM
     requirements_chain = LLMChain(llm=get_groq_llm(), prompt=get_requirements_prompt())

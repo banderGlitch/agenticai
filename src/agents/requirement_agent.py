@@ -1,4 +1,4 @@
-from langchain_core.chains import LLMChain    ## what is this llmchain?
+from langchain.chains import LLMChain    ## what is this llmchain?
 from langchain_core.prompts import PromptTemplate
 from config import get_groq_llm
 

@@ -1,0 +1,21 @@
+Snake Game Project
+================
+
+Setup
+-----
+
+1. Install Node.js and MongoDB on your system.
+2. Clone the repository and navigate to the project directory.
+3. Run `npm install` to install dependencies.
+4. Start the server by running `node server/app.js`.
+5. Open a web browser and navigate to `http://localhost:3000`.
+
+Usage
+-----
+
+1. Select a difficulty level from the dropdown menu.
+2. Use the arrow keys to control the snake.
+3. Eat food to increase your score.
+4. Avoid colliding with the game board boundaries or your own body.
+
+Note: This is a basic implementation of the Snake Game project, and you may want to add additional features or improve the game logic.

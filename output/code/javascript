@@ -1,0 +1,40 @@
+const mysql = require('mysql');
+
+const db = mysql.createConnection({
+  host: 'localhost',
+  user: 'root',
+  password: 'password',
+  database: 'tic_tac_toe',
+});
+
+db.connect();
+
+async function createGame(game) {
+  const query = `INSERT INTO games (player1, player2, board, winner, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`;
+  const values = [game.player1, game.player2, JSON.stringify(game.board), game.winner, game.createdAt, game.updatedAt];
+  await db.query(query, values);
+  return game;
+}
+
+async function getGame(gameId) {
+  const query = `SELECT * FROM games WHERE id = ?`;
+  const values = [gameId];
+  const result = await db.query(query, values);
+  return result[0];
+}
+
+async function updateGame(game) {
+  const query = `UPDATE games SET board = ?, winner = ?, updated_at = ? WHERE id = ?`;
+  const values = [JSON.stringify(game.board), game.winner, game.updatedAt, game.id];
+  await db.query(query, values);
+  return game;
+}
+
+async function createMove(move) {
+  const query = `INSERT INTO moves (game_id, player, row, col, created_at) VALUES (?, ?, ?, ?, ?)`;
+  const values = [move.gameId, move.player, move.row, move.col, move.createdAt];
+  await db.query(query, values);
+  return move;
+}
+
+module.exports = { createGame, getGame, updateGame, createMove };
